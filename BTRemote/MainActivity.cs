@@ -11,130 +11,167 @@ using System.IO;
 
 namespace BTRemote
 {
-    [Activity(Label = "BTRemote", MainLauncher = true, Icon = "@drawable/icon")]
-    public class MainActivity : Activity
+  [Activity(Label = "BTRemote", MainLauncher = true, Icon = "@drawable/icon")]
+  public class MainActivity : Activity
+  {
+    private BluetoothDevice bluetoothDevice;
+    private BluetoothAdapter bluetoothAdapter;
+    private BluetoothSocket socket;
+    private Stream outputStream;
+
+    private TextView txtStatus;
+    private Button btnLEDBlink;
+    private Button btnLEDOff;
+    private Button btnLEDOn;
+    private Button btnDisconnect;
+    private Button btnConnect;
+
+    protected override void OnCreate(Bundle bundle)
     {
-        private BluetoothDevice bluetoothDevice;
-        private BluetoothAdapter bluetoothAdapter;
-        private BluetoothSocket socket;
-        private Stream outputStream;
+      base.OnCreate(bundle);
 
-        private TextView txtStatus;
+      SetContentView(Resource.Layout.Main);
 
-        private Action<bool> A;
+      this.btnConnect = FindViewById<Button>(Resource.Id.btnConnect);
+      this.btnDisconnect = FindViewById<Button>(Resource.Id.btnDisconnect);
+      this.btnLEDOn = FindViewById<Button>(Resource.Id.btnLEDOn);
+      this.btnLEDOff = FindViewById<Button>(Resource.Id.btnLEDOff);
+      this.btnLEDBlink = FindViewById<Button>(Resource.Id.btnLEDBlink);
 
-        protected override void OnCreate(Bundle bundle)
+      this.DisableControls();
+
+      this.txtStatus = FindViewById<TextView>(Resource.Id.txtStatus);
+
+      btnConnect.Click += (sender, e) =>
+      {
+        if (FindBT() && OpenBT())
         {
-            A += (a) =>
-            {
-            };
-            base.OnCreate(bundle);
-
-            SetContentView(Resource.Layout.Main);
-
-            Button btnConnect = FindViewById<Button>(Resource.Id.btnConnect);
-            Button btnDisconnect = FindViewById<Button>(Resource.Id.btnDisconnect);
-            Button btnLEDOn = FindViewById<Button>(Resource.Id.btnLEDOn);
-            Button btnLEDOff = FindViewById<Button>(Resource.Id.btnLEDOff);
-            Button btnLEDBlink = FindViewById<Button>(Resource.Id.btnLEDBlink);
-
-            this.txtStatus = FindViewById<TextView>(Resource.Id.txtStatus);
-
-            btnConnect.Click += (sender, e) => 
-                {
-                    FindBT();
-                    OpenBT();
-
-                    btnConnect.Enabled = false;
-                    btnDisconnect.Enabled = true;
-                };
-
-            btnDisconnect.Click += (sender, e) => 
-                {
-                    CloseBT();
-                };
-
-            btnLEDOn.Click += (sender, e) => 
-                {
-                };
-
-            btnLEDOff.Click += (sender, e) => 
-                {
-                };
-
-            btnLEDBlink.Click += (sender, e) => 
-                {
-                };
+          btnConnect.Enabled = false;
+          btnDisconnect.Enabled = true;
         }
+      };
 
-        private void FindBT()
-        {
-            this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
-            if (this.bluetoothAdapter == null)
-            {
-                SetStatus("No Bluetooth Adapter found...");
-                return;
-            }
+      btnDisconnect.Click += (sender, e) =>
+      {
+        CloseBT();
+        DisableControls();
+      };
 
-            if (!this.bluetoothAdapter.IsEnabled)
-            {
-                Intent enableBluetooth = new Intent(BluetoothAdapter.ActionRequestEnable);
-                StartActivityForResult(enableBluetooth, 0);
-            }
+      btnLEDOn.Click += (sender, e) =>
+      {
+        var bytes = System.Text.Encoding.UTF8.GetBytes("A");
+        this.outputStream.Write(bytes, 0, bytes.Length);
+      };
 
-            var pairedDevices = this.bluetoothAdapter.BondedDevices;
-            if (pairedDevices.Count == 0)
-            {
-                SetStatus("No paired devices found...");
-                return;
-            }
+      btnLEDOff.Click += (sender, e) =>
+      {
+        var bytes = System.Text.Encoding.UTF8.GetBytes("a");
+        this.outputStream.Write(bytes, 0, bytes.Length);
+      };
 
-            foreach (var item in pairedDevices)
-            {
-                if (item.Name.Equals("HC-06"))
-                {
-                    this.bluetoothDevice = item;
-                    break;
-                }
-            }
-
-            if (this.bluetoothDevice == null)
-            {
-                SetStatus("Bluetooth Device HC-06 not found...");
-                return;
-            }
-            else
-            {
-                SetStatus("Found Bluetooth Device HC-06");
-            }
-        }
-
-        private void OpenBT()
-        {
-            try
-            {
-                UUID uuid = UUID.FromString("00001101-0000-1000-8000-00805f9b34fb"); //Standard SerialPortService ID
-                this.socket = this.bluetoothDevice.CreateRfcommSocketToServiceRecord(uuid);
-                this.socket.Connect();
-                this.outputStream = this.socket.OutputStream;
-                
-                SetStatus("Bluetooth Opened");
-            }
-            catch (Exception)
-            {
-                SetStatus("Unable to open Bluetooth Connection to device");
-            }
-        }
-
-        private void CloseBT()
-        {
-            this.outputStream.Close();
-            this.socket.Close();
-        }
-
-        private void SetStatus(string text)
-        {
-            this.txtStatus.Text = text;
-        }
+      btnLEDBlink.Click += (sender, e) =>
+      {
+        var bytes = System.Text.Encoding.UTF8.GetBytes("B");
+        this.outputStream.Write(bytes, 0, bytes.Length);
+      };
     }
+
+    private bool FindBT()
+    {
+      this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
+      if (this.bluetoothAdapter == null)
+      {
+        SetStatus("No Bluetooth Adapter found...");
+        return false;
+      }
+
+      if (!this.bluetoothAdapter.IsEnabled)
+      {
+        Intent enableBluetooth = new Intent(BluetoothAdapter.ActionRequestEnable);
+        StartActivityForResult(enableBluetooth, 0);
+      }
+
+      var pairedDevices = this.bluetoothAdapter.BondedDevices;
+      if (pairedDevices.Count == 0)
+      {
+        SetStatus("No paired devices found...");
+        return false;
+      }
+
+      foreach (var item in pairedDevices)
+      {
+        if (item.Name.Equals("HC-06"))
+        {
+          this.bluetoothDevice = item;
+          break;
+        }
+      }
+
+      if (this.bluetoothDevice == null)
+      {
+        SetStatus("Bluetooth Device HC-06 not found...");
+        return false;
+      }
+      else
+      {
+        SetStatus("Found Bluetooth Device HC-06");
+        return true;
+      }
+    }
+
+    private bool OpenBT()
+    {
+      try
+      {
+        UUID uuid = UUID.FromString("00001101-0000-1000-8000-00805f9b34fb"); //Standard SerialPortService ID
+        this.socket = this.bluetoothDevice.CreateRfcommSocketToServiceRecord(uuid);
+        this.socket.Connect();
+        this.outputStream = this.socket.OutputStream;
+                
+        SetStatus("Bluetooth Opened");
+
+        return true;
+      }
+      catch (Exception)
+      {
+        SetStatus("Unable to open Bluetooth Connection to device");
+        return false;
+      }
+    }
+
+    private void CloseBT()
+    {
+      if (outputStream != null)
+      {
+        this.outputStream.Close();
+      }
+      if (this.socket != null)
+      {
+        this.socket.Close();
+      }
+    }
+
+    private void SetStatus(string text)
+    {
+      this.txtStatus.Text = text;
+    }
+
+    private void EnableControls()
+    {
+      btnLEDOn.Enabled = true;
+      btnConnect.Enabled = false;
+      btnLEDBlink.Enabled = true;
+      btnDisconnect.Enabled = true;
+      btnLEDOff.Enabled = true;
+    }
+
+    private void DisableControls()
+    {
+      btnLEDOn.Enabled = false;
+      btnConnect.Enabled = true;
+      btnLEDBlink.Enabled = false;
+      btnDisconnect.Enabled = false;
+      btnLEDOff.Enabled = false;
+    }
+  }
 }
