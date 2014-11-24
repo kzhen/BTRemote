@@ -8,6 +8,7 @@ using Android.OS;
 using Android.Bluetooth;
 using Java.Util;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace BTRemote
 {
@@ -42,12 +43,18 @@ namespace BTRemote
 
       this.txtStatus = FindViewById<TextView>(Resource.Id.txtStatus);
 
-      btnConnect.Click += (sender, e) =>
+      btnConnect.Click += async (sender, e) =>
       {
-        if (FindBT() && OpenBT())
-        {
-          btnConnect.Enabled = false;
-          btnDisconnect.Enabled = true;
+          bool res;
+          res = await FindBT();
+
+          if (res)
+          {
+            res = await OpenBT();
+            if (res)
+            {
+              EnableControls();
+            }
         }
       };
 
@@ -76,67 +83,73 @@ namespace BTRemote
       };
     }
 
-    private bool FindBT()
+    private async bool FindBT()
     {
-      this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
-      if (this.bluetoothAdapter == null)
-      {
-        SetStatus("No Bluetooth Adapter found...");
-        return false;
-      }
-
-      if (!this.bluetoothAdapter.IsEnabled)
-      {
-        Intent enableBluetooth = new Intent(BluetoothAdapter.ActionRequestEnable);
-        StartActivityForResult(enableBluetooth, 0);
-      }
-
-      var pairedDevices = this.bluetoothAdapter.BondedDevices;
-      if (pairedDevices.Count == 0)
-      {
-        SetStatus("No paired devices found...");
-        return false;
-      }
-
-      foreach (var item in pairedDevices)
-      {
-        if (item.Name.Equals("HC-06"))
+      return await Task.Factory.StartNew<bool>(() =>
         {
-          this.bluetoothDevice = item;
-          break;
-        }
-      }
+          this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
+          if (this.bluetoothAdapter == null)
+          {
+            SetStatus("No Bluetooth Adapter found...");
+            return false;
+          }
 
-      if (this.bluetoothDevice == null)
-      {
-        SetStatus("Bluetooth Device HC-06 not found...");
-        return false;
-      }
-      else
-      {
-        SetStatus("Found Bluetooth Device HC-06");
-        return true;
-      }
+          if (!this.bluetoothAdapter.IsEnabled)
+          {
+            Intent enableBluetooth = new Intent(BluetoothAdapter.ActionRequestEnable);
+            StartActivityForResult(enableBluetooth, 0);
+          }
+
+          var pairedDevices = this.bluetoothAdapter.BondedDevices;
+          if (pairedDevices.Count == 0)
+          {
+            SetStatus("No paired devices found...");
+            return false;
+          }
+
+          foreach (var item in pairedDevices)
+          {
+            if (item.Name.Equals("HC-06"))
+            {
+              this.bluetoothDevice = item;
+              break;
+            }
+          }
+
+          if (this.bluetoothDevice == null)
+          {
+            SetStatus("Bluetooth Device HC-06 not found...");
+            return false;
+          }
+          else
+          {
+            SetStatus("Found Bluetooth Device HC-06");
+            return true;
+          }
+        });
     }
 
-    private bool OpenBT()
+    private async Task<bool> OpenBT()
     {
-      try
-      {
-        UUID uuid = UUID.FromString("00001101-0000-1000-8000-00805f9b34fb"); //Standard SerialPortService ID
-        this.socket = this.bluetoothDevice.CreateRfcommSocketToServiceRecord(uuid);
-        this.socket.Connect();
-        this.outputStream = this.socket.OutputStream;
-                
-        SetStatus("Bluetooth Opened");
+      return await Task.Factory.StartNew<bool>(() =>
+        {
+          try
+          {
+            UUID uuid = UUID.FromString("00001101-0000-1000-8000-00805f9b34fb"); //Standard SerialPortService ID
+            this.socket = this.bluetoothDevice.CreateRfcommSocketToServiceRecord(uuid);
+            this.socket.Connect();
+            this.outputStream = this.socket.OutputStream;
 
-        return true;
-      }
-      catch (Exception)
-      {
-        SetStatus("Unable to open Bluetooth Connection to device");
-        return false;
-      }
+            SetStatus("Bluetooth Opened");
+
+            return true;
+          }
+          catch (Exception)
+          {
+            SetStatus("Unable to open Bluetooth Connection to device");
+            return false;
+          }
+        });
     }
 
     private void CloseBT()
@@ -153,7 +166,10 @@ namespace BTRemote
 
     private void SetStatus(string text)
     {
-      this.txtStatus.Text = text;
+      RunOnUiThread(() =>
+        {
+          this.txtStatus.Text = text;
+        });
     }
 
     private void EnableControls()
