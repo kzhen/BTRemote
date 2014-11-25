@@ -9,11 +9,39 @@ using Android.Bluetooth;
 using Java.Util;
 using System.IO;
 using System.Threading.Tasks;
+using Android.Support.V4.App;
 
 namespace BTRemote
 {
+  public class MyDialogFragment : DialogFragment
+  {
+    public override Dialog OnCreateDialog(Bundle savedInstanceState)
+    {
+      var builder = new AlertDialog.Builder(Activity)
+        .SetMessage("This is a test")
+        .SetPositiveButton("OK", (sender, e)=>{
+          //do something...
+        })
+        .SetTitle("My custom dialog");
+
+      return builder.Create();
+    }
+  }
+
+  public class MySecondDialogFragment : DialogFragment
+  {
+    public override View OnCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
+    {
+      base.OnCreateView(inflater, container, savedInstanceState);
+
+      var view = inflater.Inflate(Resource.Layout.BluetoothDeviceSelection, container, false);
+
+      return view;
+    }
+  }
+
   [Activity(Label = "BTRemote", MainLauncher = true, Icon = "@drawable/icon")]
-  public class MainActivity : Activity
+  public class MainActivity : FragmentActivity
   {
     private BluetoothDevice bluetoothDevice;
     private BluetoothAdapter bluetoothAdapter;
@@ -33,6 +61,8 @@ namespace BTRemote
 
       SetContentView(Resource.Layout.Main);
 
+      this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
+     
       this.btnConnect = FindViewById<Button>(Resource.Id.btnConnect);
       this.btnDisconnect = FindViewById<Button>(Resource.Id.btnDisconnect);
       this.btnLEDOn = FindViewById<Button>(Resource.Id.btnLEDOn);
@@ -46,16 +76,33 @@ namespace BTRemote
       btnConnect.Click += async (sender, e) =>
       {
           bool res;
-          res = await FindBT();
+          try {
+            
+            res = await FindBT();
+          } catch (Exception ex) {
+            res = false;
+          }
+
 
           if (res)
           {
-            res = await OpenBT();
+            try {
+              res = await OpenBT();
+              
+            } catch (Exception ex) {
+              res = false;
+            }
             if (res)
             {
               EnableControls();
             }
-        }
+        } 
+//          else {
+            var transaction = this.SupportFragmentManager.BeginTransaction();
+          //var dialog = new MyDialogFragment();
+            var dialog = new MySecondDialogFragment();
+           dialog.Show(transaction, "dialog_fragment");
+//        }
       };
 
       btnDisconnect.Click += (sender, e) =>
@@ -83,11 +130,10 @@ namespace BTRemote
       };
     }
 
-    private async bool FindBT()
+    private async Task<bool> FindBT()
     {
       return await Task.Factory.StartNew<bool>(() =>
         {
-          this.bluetoothAdapter = BluetoothAdapter.DefaultAdapter;
           if (this.bluetoothAdapter == null)
           {
             SetStatus("No Bluetooth Adapter found...");
